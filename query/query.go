@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rs/zerolog"
 	gremcos "github.com/supplyon/gremcos"
@@ -11,7 +12,16 @@ import (
 var Cosmos gremcos.Cosmos
 var Logger zerolog.Logger
 
-func QueryCosmosEventBy(targetV string) {
+func QueryCosmos(queryStr string) {
+	res, err := Cosmos.Execute(queryStr)
+	if err != nil {
+		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", queryStr)
+		return
+	}
+
+	printResponses(api.ResponseArray(res), Logger)
+}
+func QueryCosmosEbyOutV(targetV string) {
 
 	g := api.NewGraph("g")
 	query := g.VByStr(targetV).InE().OutV().OutE()
@@ -20,7 +30,7 @@ func QueryCosmosEventBy(targetV string) {
 	res, err := Cosmos.ExecuteQuery(query)
 
 	if err != nil {
-		Logger.Error().Err(err).Msg("Failed to execute a gremlin command")
+		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", query)
 		return
 	}
 
@@ -35,9 +45,15 @@ func cosmosExistV(id string) bool {
 	}
 	vertices, err := api.ResponseArray(res).ToVertices()
 	if err != nil {
-		Logger.Error().Err(err).Msg("Failed to resolve cosmos response")
+		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", query)
 	}
 	return len(vertices) > 0
+}
+
+// Escape '
+func e(s string) string {
+	s = strings.Replace(s, "'", "\\'", -1)
+	return s
 }
 
 // Add V if not exist
@@ -46,30 +62,34 @@ func cosmosExistV(id string) bool {
 func cosmosAddV(label string, pkq string, id string) {
 	queryStr := fmt.Sprintf(
 		"g.inject(0).coalesce(__.V('%s'), __.addV('%s').property('q','%s').property('id','%s'))",
-		id, label, pkq, id)
+		e(id), e(label), e(pkq), e(id))
 
 	// Logger.Warn().Msgf("addV Query: %s", queryStr)
 
 	_, err := Cosmos.Execute(queryStr)
 	if err != nil {
-		Logger.Error().Err(err).Msg("Failed to execute a gremlin command")
+		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", queryStr)
 		return
 	}
 
 	// printResponses(api.ResponseArray(res), Logger)
 }
 
-func cosmosAddE(label string, fromV string, toV string) {
+func cosmosAddE(label string, fromV string, toV string, properties map[string]string) {
+	propStr := ""
+	for k, v := range properties {
+		propStr += fmt.Sprintf(".property('%s','%s')", e(k), e(v))
+	}
 	queryStr := fmt.Sprintf(`g.V('%s').coalesce(
-    __.outE('%s').where(inV().hasId('%s')),
-    __.addE('%s').to(g.V('%s')))`,
-		fromV, label, toV, label, toV)
+    __.outE('%s').where(inV().hasId('%s'))%s ,
+    __.addE('%s').to(g.V('%s'))%s)`,
+		e(fromV), e(label), e(toV), propStr, e(label), e(toV), propStr)
 
 	// Logger.Warn().Msgf("addE Query: %s", queryStr)
 
 	_, err := Cosmos.Execute(queryStr)
 	if err != nil {
-		Logger.Error().Err(err).Msg("Failed to execute a gremlin command")
+		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", queryStr)
 		return
 	}
 
@@ -78,21 +98,21 @@ func cosmosAddE(label string, fromV string, toV string) {
 
 // Add edges from many to one
 // if any of Edges[many to one] exists, don't add
-func cosmosAddE_x2o(label string, toV string, fromVs ...string) {
+func cosmosAddE_x2o(label string, toV string, fromVs []string) {
 	queryStr := "g.V().has('id', within("
 	for _, fromV := range fromVs {
-		queryStr += fmt.Sprintf("'%s',", fromV)
+		queryStr += fmt.Sprintf("'%s',", e(fromV))
 	}
 	queryStr += fmt.Sprintf(`)).as('items').V('%s') 
   .coalesce(__.inE('%s').where(outV().as('items')), 
             __.addE('%s').from('items'))`,
-		toV, label, label)
+		e(toV), e(label), e(label))
 
 	// Logger.Warn().Msgf("addE_x2o Query: %s", queryStr)
 
 	_, err := Cosmos.Execute(queryStr)
 	if err != nil {
-		Logger.Error().Err(err).Msg("Failed to execute a gremlin command")
+		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", queryStr)
 		return
 	}
 
@@ -121,7 +141,7 @@ func printResponses(responses api.ResponseArray, logger zerolog.Logger) {
 	if err == nil {
 		logger.Info().Msgf("Received Edges: %v", len(edges))
 		for _, e := range edges {
-			logger.Info().Msgf("%16v:%-10v\t-%-10v->\t%10v:%-10v\t%v %v", e.OutV, e.OutVLabel, e.Label, e.InV, e.InVLabel, e.Type, e.ID)
+			logger.Info().Msgf("%16v:%-10v\t-%-10v->\t%16v:%-10v\t%v", e.OutV, e.OutVLabel, e.Label, e.InV, e.InVLabel, e.Properties)
 		}
 	}
 	if properties == nil && vertices == nil && edges == nil {

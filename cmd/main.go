@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -16,10 +18,12 @@ func main() {
 	q.Logger = zerolog.New(os.Stdout).Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.StampMilli}).With().Timestamp().Logger()
 	q.Cosmos = connectCosmos(q.Logger)
 	defer func() {
-		year := "700 BC"
+		year := strings.Join(os.Args[1:], " ")
 		q.WikiEventByYear(year)
 		time.Sleep(time.Second * 2)
-		q.QueryCosmosEventBy(year)
+		q.QueryCosmos(fmt.Sprintf("g.V('%s').inE().outV()", year))
+		q.QueryCosmos(fmt.Sprintf("g.V('%s').inE().outV().outE().order().by('label')", year))
+		q.QueryCosmos(fmt.Sprintf("g.E().has('by_year', '%s')", year))
 	}()
 	// cosmos := connectCosmos(logger)
 	// query.QueryCosmos(cosmos, logger)
