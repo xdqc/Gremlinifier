@@ -21,6 +21,22 @@ func QueryCosmos(queryStr string) {
 
 	printResponses(api.ResponseArray(res), Logger)
 }
+
+func QueryCosmosValues(queryStr string) []api.TypedValue {
+	res, err := Cosmos.Execute(queryStr)
+	if err != nil {
+		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", queryStr)
+		return nil
+	}
+
+	values, err := api.ResponseArray(res).ToValues()
+	if err != nil {
+		Logger.Error().Err(err).Msgf("Failed to get values from gremlin response.")
+		return nil
+	}
+	return values
+}
+
 func QueryCosmosEbyOutV(targetV string) {
 
 	g := api.NewGraph("g")
@@ -132,8 +148,8 @@ func printResponses(responses api.ResponseArray, logger zerolog.Logger) {
 		logger.Info().Msgf("Received Vertices: %v", len(vertices))
 		for _, v := range vertices {
 			logger.Info().Msgf("%-8v\t%v", v.ID, v.Label)
-			for _, p := range v.Properties {
-				logger.Info().Msgf("\t\t%v", p[0])
+			for k, p := range v.Properties {
+				logger.Info().Msgf("\t\t%s\t%v", k, p[0].Value)
 			}
 		}
 	}
