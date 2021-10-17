@@ -28,7 +28,7 @@ func main() {
 		// q.QueryCosmos(fmt.Sprintf("g.V('%s').inE().outV().outE().order().by('label')", year))
 		// q.QueryCosmos(("g.V().hasLabel('year').order().by('id').range(local,30,-1)"))
 
-		addEdgePathologyFollow("C")
+		addEdgePatientHasPathology()
 	}()
 	// cosmos := connectCosmos(logger)
 	// query.QueryCosmos(cosmos, logger)
@@ -40,6 +40,59 @@ func main() {
 	// 	logger.Error().Err(err).Msg("Failed to stop cosmos connector")
 	// }
 	// logger.Info().Msg("Teared down")
+}
+
+func addEdgeTumorDiagnose() {
+	tumors := q.QueryCosmosValues("g.V().haslabel('primary_tumor').project('properties').by(__.valueMap())")
+	for _, t := range tumors {
+		tumor := t.Value.(map[string]interface{})["properties"]
+		tumor_name := tumor.(map[string]interface{})["name"].([]interface{})[0]
+		diagnosis := tumor.(map[string]interface{})["diagnosis"].([]interface{})[0]
+		diagnose_dates := tumor.(map[string]interface{})["diagnose_date"]
+		intake_dates := tumor.(map[string]interface{})["intake_date"]
+		gremlin := fmt.Sprintf(`g
+		.V().haslabel('icd10').has('name', '%s').as('diag')
+		.V().haslabel('primary_tumor').has('name', '%s').as('tu')
+		.coalesce(
+			__.outE('diagnose_of'),
+			__.addE('diagnose_of').to('diag')
+		)`, diagnosis, tumor_name)
+		if diagnose_dates != nil {
+			gremlin += fmt.Sprintf(".property('diagnose_date', '%s')", diagnose_dates.([]interface{})[0])
+		}
+		if intake_dates != nil {
+			gremlin += fmt.Sprintf(".property('intake_date', '%s')", intake_dates.([]interface{})[0])
+		}
+		// q.Logger.Debug().Msg(gremlin)
+		q.QueryCosmos(gremlin)
+	}
+}
+
+func addEdgePatientHasPathology() {
+	pathologies := q.QueryCosmosValues("g.V().haslabel('pathology_analysis').project('id','properties').by(__.id()).by(__.valueMap())")
+	for _, pa := range pathologies {
+		paid := pa.Value.(map[string]interface{})["id"]
+		pp := pa.Value.(map[string]interface{})["properties"]
+		pk := pp.(map[string]interface{})["pk"].([]interface{})[0]
+		// paname := pp.(map[string]interface{})["name"].([]interface{})[0]
+		sample_date := pp.(map[string]interface{})["sample_date"].([]interface{})[0]
+		report_date := pp.(map[string]interface{})["report_date"]
+		gremlin := fmt.Sprintf(`g.V().has('id', '%s').as('pa').outE().haslabel('pathology_diagnose_tumor').select('pa')
+		.coalesce(
+			__.outE('pathology_report_diagnose'),
+			__.addE('pathology_report_diagnose').to(__.V().has('id','%s'))
+		).property('sample_date', '%s')`, paid, pk, sample_date)
+		// gremlin = fmt.Sprintf(`g.V().has('id', '%s').as('pa')
+		// .coalesce(
+		// 	 __.inE('has_pathology'),
+		// 	__.addE('has_pathology').from(__.V().has('id','%s'))
+		// ).property('sample_date', '%s')`, paid, pk, sample_date)
+		if report_date != nil {
+			gremlin += fmt.Sprintf(".property('report_date', '%s')", report_date.([]interface{})[0])
+		}
+		// q.Logger.Debug().Msgf(gremlin)
+		q.QueryCosmos(gremlin)
+	}
 }
 
 func addEdgePathologyFollow(pType string) {
