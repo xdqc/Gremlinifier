@@ -7,19 +7,30 @@ import (
 	"github.com/rs/zerolog"
 	gremcos "github.com/supplyon/gremcos"
 	"github.com/supplyon/gremcos/api"
+	"github.com/supplyon/gremcos/interfaces"
 )
 
 var Cosmos gremcos.Cosmos
 var Logger zerolog.Logger
 
-func QueryCosmos(queryStr string) {
+func QueryCosmos(queryStr string) error {
 	res, err := Cosmos.Execute(queryStr)
 	if err != nil {
 		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", queryStr)
-		return
+		return err
 	}
 
 	printResponses(api.ResponseArray(res), Logger)
+	return nil
+}
+
+func QueryCosmosRes(queryStr string) []interfaces.Response {
+	res, err := Cosmos.Execute(queryStr)
+	if err != nil {
+		Logger.Error().Err(err).Msgf("Failed to execute a gremlin command: %s", queryStr)
+		return nil
+	}
+	return res
 }
 
 func QueryCosmosValues(queryStr string) []api.TypedValue {
@@ -53,7 +64,7 @@ func QueryCosmosEbyOutV(targetV string) {
 	printResponses(api.ResponseArray(res), Logger)
 }
 
-func cosmosExistV(id string) bool {
+func QueryCosmosExistV(id string) bool {
 	query := api.NewGraph("g").VByStr(id)
 	res, err := Cosmos.ExecuteQuery(query)
 	if err != nil {
@@ -75,7 +86,7 @@ func e(s string) string {
 // Add V if not exist
 // https://tinkerpop.apache.org/docs/3.3.2/reference/#inject-step
 // https://tinkerpop.apache.org/docs/3.3.2/reference/#coalesce-step
-func cosmosAddV(label string, pkq string, id string) {
+func CosmosAddV(label string, pkq string, id string) {
 	queryStr := fmt.Sprintf(
 		"g.inject(0).coalesce(__.V('%s'), __.addV('%s').property('q','%s').property('id','%s'))",
 		e(id), e(label), e(pkq), e(id))
@@ -91,7 +102,7 @@ func cosmosAddV(label string, pkq string, id string) {
 	// printResponses(api.ResponseArray(res), Logger)
 }
 
-func cosmosAddE(label string, fromV string, toV string, properties map[string]string) {
+func CosmosAddE(label string, fromV string, toV string, properties map[string]string) {
 	propStr := ""
 	for k, v := range properties {
 		propStr += fmt.Sprintf(".property('%s','%s')", e(k), e(v))
@@ -114,7 +125,7 @@ func cosmosAddE(label string, fromV string, toV string, properties map[string]st
 
 // Add edges from many to one
 // if any of Edges[many to one] exists, don't add
-func cosmosAddE_x2o(label string, toV string, fromVs []string) {
+func CosmosAddE_x2o(label string, toV string, fromVs []string) {
 	queryStr := "g.V().has('id', within("
 	for _, fromV := range fromVs {
 		queryStr += fmt.Sprintf("'%s',", e(fromV))
