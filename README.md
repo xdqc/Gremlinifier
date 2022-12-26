@@ -1,8 +1,17 @@
 # Gremlinifier
 
-To build graph database (Gremlin API) from free texts and semi-structued data.
+The backend API connecting with Cosmos DB (Gremlin), to power the [graph database visulization](https://github.com/xdqc/kankerpop-visualizer) of linked data. 
+
+The customizable scripts can also ingest free texts and semi-structued data into a graph network.
 
 ## Use cases
+
+### Oncology network
+
+[![cancer-logic-model](/docs/cancerpop-visualizer.png)](https://github.com/xdqc/kankerpop-visualizer)
+(pseudonymized linked data of oncology study from different sources)
+
+From multidimensional relational databases and freetext reports to a semantic network of clinics, diagnosis (pathological, radiological, genomics), deseases (tumors, metastasis), treatments (surgery, radiotherapy, medication), responses and assessments data.
 
 ### History events graph
 
@@ -14,10 +23,3 @@ Wikipedia articles are recording events for each calendar year. The intention is
 The HTML pages are relatively structured starting from 700 BC, For example https://en.wikipedia.org/wiki/700_BC. 
 
 A web scrapper is built to extract data from these pages, and store information as nodes/edges in the graph database.
-
-### Oncology network
-
-![cancer-logic-model](/docs/cancer-logic-model.jpeg)
-(illustration of the oversimplified snowflake schema of HL7 FHIR model)
-
-From multidimensional relational databases and freetext reports to a semantic network of clinics, diagnosis (pathological, radiological, genomics), deseases (tumors, metastasis), treatments (surgery, radiotherapy, medication), responses and assessments data.
